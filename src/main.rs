@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use edge_dhcp::{server::Server, DhcpOption, Ipv4Addr, MessageType, Options, Packet};
+use edge_dhcp::{DhcpOption, Ipv4Addr, MessageType, Options, Packet};
 use embassy_net::{
     udp::{PacketMetadata, UdpSocket},
     Config, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4,
@@ -16,12 +16,11 @@ use esp_hal::{
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
-use esp_println::println;
 use esp_wifi::{
     initialize,
     wifi::{
-        AccessPointConfiguration, ClientConfiguration, Configuration, WifiApDevice, WifiController,
-        WifiDevice, WifiEvent, WifiStaDevice, WifiState,
+        AccessPointConfiguration, Configuration, WifiApDevice, WifiController, WifiDevice,
+        WifiEvent, WifiState,
     },
     EspWifiInitFor,
 };
@@ -35,16 +34,12 @@ macro_rules! mk_static {
     }};
 }
 
-const SSID: &str = env!("SSID");
-const PASSWORD: &str = env!("PASSWORD");
-
 #[main]
 async fn main(spawner: embassy_executor::Spawner) {
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
 
     let clocks = ClockControl::max(system.clock_control).freeze();
-    let delay = Delay::new(&clocks);
 
     esp_println::logger::init_logger_from_env();
     let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, None);
@@ -126,7 +121,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     loop {
         let res = sock.recv_from(&mut buf).await;
         if let Ok((n, addr)) = res {
-            println!("received {n} from {addr:?}");
+            log::info!("received {n} from {addr:?}");
 
             let res = Packet::decode(&buf[..n]);
             if let Ok(packet) = res {
@@ -202,8 +197,8 @@ async fn main(spawner: embassy_executor::Spawner) {
 }
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
-    println!("start connection task");
-    println!("Device capabilities: {:?}", controller.get_capabilities());
+    log::info!("start connection task");
+    log::info!("Device capabilities: {:?}", controller.get_capabilities());
     loop {
         match esp_wifi::wifi::get_wifi_state() {
             WifiState::ApStarted => {
@@ -219,9 +214,9 @@ async fn connection(mut controller: WifiController<'static>) {
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();
-            println!("Starting wifi");
+            log::info!("Starting wifi");
             controller.start().await.unwrap();
-            println!("Wifi started!");
+            log::info!("Wifi started!");
         }
     }
 }
