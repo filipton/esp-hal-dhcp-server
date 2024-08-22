@@ -1,0 +1,45 @@
+[package]
+name = "esp-hal-dhcp-test"
+version = "0.1.0"
+authors = ["filipton <filipton12@gmail.com>"]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+esp-backtrace = { version = "0.13.0", features = [
+    "esp32s3",
+    "exception-handler",
+    "panic-handler",
+    "println",
+] }
+esp-hal = { version = "0.19.0", features = [ "esp32s3", "async" ] }
+esp-println = { version = "0.10.0", features = ["esp32s3", "log"] }
+log = { version = "0.4.22" }
+embedded-io = "0.6.1"
+esp-wifi = { version = "0.7.1", features = ["async", "dump-packets", "embassy-net", "esp32s3", "phy-enable-usb", "utils", "wifi", "wifi-default"] }
+heapless = { version = "0.8.0", default-features = false }
+esp-hal-embassy = { version = "0.2.0", features = ["esp32s3", "integrated-timers"] }
+embassy-executor = { version = "0.5.0", features = ["task-arena-size-16384"] }
+embassy-net = { version = "0.4.0", features = ["tcp", "udp", "medium-ethernet", "dhcpv4"] }
+static_cell = "2.1.0"
+embassy-time = "0.3.2"
+edge-dhcp = { version = "0.2.0", default-features = false }
+embedded-nal = "0.8.0"
+embedded-nal-async = "0.7.1"
+embedded-nal-async-xtra = "0.2.0"
+[profile.dev]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
+
+[profile.release]
+codegen-units = 1 # LLVM can perform better optimizations using a single thread
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false
+
+[build-dependencies]
+dotenvy = "0.15.7"
