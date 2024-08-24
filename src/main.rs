@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use edge_dhcp::{DhcpOption, Ipv4Addr, MessageType, Options, Packet};
+use edge_dhcp::{server::Action, DhcpOption, Ipv4Addr, MessageType, Options, Packet};
 use embassy_net::{
     udp::{PacketMetadata, UdpSocket},
     Config, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4,
@@ -33,6 +33,9 @@ macro_rules! mk_static {
         x
     }};
 }
+
+const DHCP_BROADCAST: embassy_net::IpEndpoint =
+    embassy_net::IpEndpoint::new(embassy_net::IpAddress::v4(255, 255, 255, 255), 68);
 
 #[main]
 async fn main(spawner: embassy_executor::Spawner) {
@@ -98,10 +101,10 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     log::info!("Connect to ap");
 
-    let mut rx_buffer = [0; 4096];
-    let mut tx_buffer = [0; 4096];
-    let mut rx_meta = [PacketMetadata::EMPTY; 32];
-    let mut tx_meta = [PacketMetadata::EMPTY; 32];
+    let mut rx_buffer = [0; 1024];
+    let mut tx_buffer = [0; 1024];
+    let mut rx_meta = [PacketMetadata::EMPTY; 16];
+    let mut tx_meta = [PacketMetadata::EMPTY; 16];
     let mut sock = UdpSocket::new(
         &stack,
         &mut rx_meta,
@@ -113,9 +116,8 @@ async fn main(spawner: embassy_executor::Spawner) {
     let endpoint = embassy_net::IpEndpoint::new(embassy_net::IpAddress::v4(0, 0, 0, 0), 67);
     sock.bind(endpoint).unwrap();
 
-    //let ip = Ipv4Addr::new(192, 168, 0, 1);
-    //let mut gw_buf = [Ipv4Addr::UNSPECIFIED];
-    //edge_dhcp::server::
+    // ensure same as ap ip
+    let server_ip = Ipv4Addr::new(192, 168, 2, 1);
 
     let mut buf = [0; 1024];
     loop {
@@ -125,70 +127,70 @@ async fn main(spawner: embassy_executor::Spawner) {
 
             let res = Packet::decode(&buf[..n]);
             if let Ok(packet) = res {
-                let message_type = packet.options.iter().find_map(|option| {
-                    if let DhcpOption::MessageType(message_type) = option {
-                        Some(message_type)
-                    } else {
+                let action = process_packet(&packet, server_ip).unwrap();
+
+                let mut opt_buf = Options::buf();
+                let reply_packet = match action {
+                    Action::Discover(_requested_ip, _mac) => {
+                        // TODO: make this into trait function (to get ip from mac, and considering requested_ip)
+                        let ip = Ipv4Addr::new(192, 168, 2, 69);
+
+                        let reply = packet.new_reply(
+                            Some(ip),
+                            packet.options.reply(
+                                edge_dhcp::MessageType::Offer,
+                                server_ip,
+                                3600,
+                                &[],
+                                None,
+                                &[],
+                                &mut opt_buf,
+                            ),
+                        );
+                        Some(reply)
+                    }
+                    Action::Request(ip, _mac) => {
+                        // TODO: make this into trait function as well
+                        let ip = Some(ip); // return none if NAK
+
+                        let msg_type = match ip {
+                            Some(_) => MessageType::Ack,
+                            None => MessageType::Nak,
+                        };
+
+                        let reply = packet.new_reply(
+                            ip,
+                            packet.options.reply(
+                                msg_type,
+                                server_ip,
+                                3600,
+                                &[],
+                                None,
+                                &[],
+                                &mut opt_buf,
+                            ),
+                        );
+                        Some(reply)
+                    }
+                    Action::Release(_ip, _mac) | Action::Decline(_ip, _mac) => {
+                        // TODO: remove lease
+
                         None
                     }
-                });
-
-                let message_type = if let Some(message_type) = message_type {
-                    message_type
-                } else {
-                    log::warn!("Ignoring DHCP request, no message type found: {packet:?}");
-                    continue;
                 };
 
-                let mut opt = Options::buf();
-
-                if message_type == MessageType::Discover {
-                    let reply = packet.new_reply(
-                        Some(Ipv4Addr::new(192, 168, 2, 10)),
-                        packet.options.reply(
-                            edge_dhcp::MessageType::Offer,
-                            Ipv4Addr::new(192, 168, 2, 1),
-                            3600,
-                            &[],
-                            None,
-                            &[],
-                            &mut opt,
-                        ),
-                    );
-
-                    let res = reply.encode(&mut buf);
-                    if let Ok(res) = res {
-                        //_ = sock.send_to(res, addr).await;
-
-                        let bc = embassy_net::IpEndpoint::new(
-                            embassy_net::IpAddress::v4(255, 255, 255, 255),
-                            68,
-                        );
-                        _ = sock.send_to(res, bc).await;
-                    }
-                } else if message_type == MessageType::Request {
-                    let reply = packet.new_reply(
-                        Some(Ipv4Addr::new(192, 168, 2, 10)),
-                        packet.options.reply(
-                            edge_dhcp::MessageType::Ack,
-                            Ipv4Addr::new(192, 168, 2, 1),
-                            3600,
-                            &[],
-                            None,
-                            &[],
-                            &mut opt,
-                        ),
-                    );
-
-                    let res = reply.encode(&mut buf);
-                    if let Ok(res) = res {
-                        //_ = sock.send_to(res, addr).await;
-
-                        let bc = embassy_net::IpEndpoint::new(
-                            embassy_net::IpAddress::v4(255, 255, 255, 255),
-                            68,
-                        );
-                        _ = sock.send_to(res, bc).await;
+                if let Some(reply) = reply_packet {
+                    let bytes_res = reply.encode(&mut buf);
+                    match bytes_res {
+                        Ok(bytes) => {
+                            let res = sock.send_to(bytes, DHCP_BROADCAST).await;
+                            if let Err(e) = res {
+                                log::error!("Dhcp sock send error: {e:?}");
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Dhcp encode error: {e:?}");
+                        }
                     }
                 }
             }
@@ -224,4 +226,64 @@ async fn connection(mut controller: WifiController<'static>) {
 #[embassy_executor::task]
 async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
     stack.run().await
+}
+
+pub fn process_packet<'a>(request: &'a Packet<'a>, server_ip: Ipv4Addr) -> Option<Action<'a>> {
+    if request.reply {
+        return None;
+    }
+
+    let message_type = request.options.iter().find_map(|option| match option {
+        DhcpOption::MessageType(msg_type) => Some(msg_type),
+        _ => None,
+    });
+
+    let message_type = message_type.or_else(|| {
+        log::warn!("Ignoring DHCP request, no message type found: {request:?}");
+        None
+    })?;
+
+    let server_identifier = request.options.iter().find_map(|option| match option {
+        DhcpOption::ServerIdentifier(ip) => Some(ip),
+        _ => None,
+    });
+
+    if server_identifier.is_some() && server_identifier != Some(server_ip) {
+        log::warn!("Ignoring {message_type} request, not addressed to this server: {request:?}");
+        return None;
+    }
+
+    match message_type {
+        MessageType::Discover => Some(Action::Discover(
+            requested_ip(&request.options),
+            &request.chaddr,
+        )),
+        MessageType::Request => {
+            let requested_ip = requested_ip(&request.options).or_else(|| {
+                match request.ciaddr.is_unspecified() {
+                    true => None,
+                    false => Some(request.ciaddr),
+                }
+            })?;
+
+            Some(Action::Request(requested_ip, &request.chaddr))
+        }
+        MessageType::Release if server_identifier == Some(server_ip) => {
+            Some(Action::Release(request.yiaddr, &request.chaddr))
+        }
+        MessageType::Decline if server_identifier == Some(server_ip) => {
+            Some(Action::Decline(request.yiaddr, &request.chaddr))
+        }
+        _ => None,
+    }
+}
+
+pub fn requested_ip<'a>(options: &'a Options<'a>) -> Option<Ipv4Addr> {
+    options.iter().find_map(|option| {
+        if let DhcpOption::RequestedIpAddress(ip) = option {
+            Some(ip)
+        } else {
+            None
+        }
+    })
 }

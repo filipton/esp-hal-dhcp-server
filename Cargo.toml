@@ -1,5 +1,5 @@
 [package]
-name = "esp-hal-dhcp-test"
+name = "esp-hal-dhcp"
 version = "0.1.0"
 authors = ["filipton <filipton12@gmail.com>"]
 edition = "2021"
