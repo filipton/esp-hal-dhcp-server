@@ -6,11 +6,10 @@ use embassy_net::{
     udp::{PacketMetadata, UdpSocket},
     Config, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4,
 };
-use embassy_time::{Duration, Timer};
+use embassy_time::{Duration, Instant, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     clock::ClockControl,
-    delay::Delay,
     peripherals::Peripherals,
     prelude::*,
     system::SystemControl,
@@ -118,6 +117,11 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     // ensure same as ap ip
     let server_ip = Ipv4Addr::new(192, 168, 2, 1);
+    let test_dhcp: &mut dyn DhcpLeaser = &mut TestDhcpLeaser {
+        leases: heapless::Vec::new(),
+        start: Ipv4Addr::new(192, 168, 2, 10),
+        end: Ipv4Addr::new(192, 168, 2, 20),
+    };
 
     let mut buf = [0; 1024];
     loop {
@@ -131,27 +135,47 @@ async fn main(spawner: embassy_executor::Spawner) {
 
                 let mut opt_buf = Options::buf();
                 let reply_packet = match action {
-                    Action::Discover(_requested_ip, _mac) => {
-                        // TODO: make this into trait function (to get ip from mac, and considering requested_ip)
-                        let ip = Ipv4Addr::new(192, 168, 2, 69);
+                    Action::Discover(requested_ip, mac) => {
+                        let ip = requested_ip
+                            .and_then(|ip| {
+                                let mac_lease = test_dhcp.get_lease(*mac);
+                                let available = mac_lease
+                                    .map(|d| d.ip == ip || Instant::now() > d.expires)
+                                    .unwrap_or(true);
 
-                        let reply = packet.new_reply(
-                            Some(ip),
-                            packet.options.reply(
-                                edge_dhcp::MessageType::Offer,
-                                server_ip,
-                                3600,
-                                &[],
-                                None,
-                                &[],
-                                &mut opt_buf,
-                            ),
-                        );
-                        Some(reply)
+                                available.then_some(ip)
+                            })
+                            .or_else(|| test_dhcp.get_lease(*mac).map(|l| l.ip))
+                            .or_else(|| test_dhcp.next_lease());
+
+                        ip.map(|ip| {
+                            packet.new_reply(
+                                Some(ip),
+                                packet.options.reply(
+                                    edge_dhcp::MessageType::Offer,
+                                    server_ip,
+                                    3600,
+                                    &[],
+                                    None,
+                                    &[],
+                                    &mut opt_buf,
+                                ),
+                            )
+                        })
                     }
-                    Action::Request(ip, _mac) => {
-                        // TODO: make this into trait function as well
-                        let ip = Some(ip); // return none if NAK
+                    Action::Request(ip, mac) => {
+                        let mac_lease = test_dhcp.get_lease(*mac);
+                        let available = mac_lease
+                            .map(|d| d.ip == ip || Instant::now() > d.expires)
+                            .unwrap_or(true);
+
+                        let ip = (available
+                            && test_dhcp.add_lease(
+                                ip,
+                                *mac,
+                                Instant::now() + Duration::from_secs(3600),
+                            ))
+                        .then_some(ip);
 
                         let msg_type = match ip {
                             Some(_) => MessageType::Ack,
@@ -172,9 +196,8 @@ async fn main(spawner: embassy_executor::Spawner) {
                         );
                         Some(reply)
                     }
-                    Action::Release(_ip, _mac) | Action::Decline(_ip, _mac) => {
-                        // TODO: remove lease
-
+                    Action::Release(_ip, mac) | Action::Decline(_ip, mac) => {
+                        test_dhcp.remove_lease(*mac);
                         None
                     }
                 };
@@ -286,4 +309,74 @@ pub fn requested_ip<'a>(options: &'a Options<'a>) -> Option<Ipv4Addr> {
             None
         }
     })
+}
+
+#[derive(Debug, Clone)]
+pub struct DhcpLease {
+    pub ip: Ipv4Addr,
+    pub mac: [u8; 16],
+    pub expires: Instant,
+}
+
+pub trait DhcpLeaser {
+    fn get_lease(&mut self, mac: [u8; 16]) -> Option<DhcpLease>;
+    fn next_lease(&mut self) -> Option<Ipv4Addr>;
+    fn add_lease(&mut self, ip: Ipv4Addr, mac: [u8; 16], expires: Instant) -> bool;
+    fn remove_lease(&mut self, mac: [u8; 16]) -> bool;
+}
+
+pub struct TestDhcpLeaser {
+    pub start: Ipv4Addr,
+    pub end: Ipv4Addr,
+    pub leases: heapless::Vec<DhcpLease, 16>,
+}
+
+impl DhcpLeaser for TestDhcpLeaser {
+    fn get_lease(&mut self, mac: [u8; 16]) -> Option<DhcpLease> {
+        for lease in &self.leases {
+            if lease.mac == mac {
+                return Some(lease.clone());
+            }
+        }
+
+        None
+    }
+
+    fn next_lease(&mut self) -> Option<Ipv4Addr> {
+        let start: u32 = self.start.into();
+        let end: u32 = self.end.into();
+
+        for ip in start..=end {
+            let ip: Ipv4Addr = ip.into();
+            let mut found = false;
+
+            for lease in &self.leases {
+                if lease.ip == ip {
+                    found = true;
+                }
+            }
+
+            if !found {
+                return Some(ip);
+            }
+        }
+
+        None
+    }
+
+    fn add_lease(&mut self, ip: Ipv4Addr, mac: [u8; 16], expires: Instant) -> bool {
+        self.remove_lease(mac);
+        self.leases.push(DhcpLease { ip, mac, expires }).is_ok()
+    }
+
+    fn remove_lease(&mut self, mac: [u8; 16]) -> bool {
+        for (i, lease) in self.leases.iter().enumerate() {
+            if lease.mac == mac {
+                self.leases.remove(i);
+                return true;
+            }
+        }
+
+        false
+    }
 }
