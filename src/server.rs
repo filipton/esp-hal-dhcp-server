@@ -90,16 +90,7 @@ impl<'a> DhcpServer<'a> {
         }
     }
 
-    async fn send_reply(
-        &mut self,
-        packet: Packet<'_>,
-        mt: MessageType,
-        ip: Option<Ipv4Addr>,
-        // TODO: add these to DhcpServer struct
-        //gateways: &[Ipv4Addr],
-        //subnet: Option<Ipv4Addr>,
-        //dns: &[Ipv4Addr],
-    ) {
+    async fn send_reply(&mut self, packet: Packet<'_>, mt: MessageType, ip: Option<Ipv4Addr>) {
         let mut opt_buf = Options::buf();
         let reply = packet.new_reply(
             ip,
@@ -107,12 +98,9 @@ impl<'a> DhcpServer<'a> {
                 mt,
                 self.config.ip,
                 self.config.lease_time.as_secs() as u32,
-                //gateways,
-                //subnet,
-                //dns,
-                &[],
-                None,
-                &[],
+                self.config.gateways,
+                self.config.subnet,
+                self.config.dns,
                 &mut opt_buf,
             ),
         );
