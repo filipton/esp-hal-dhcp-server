@@ -266,6 +266,7 @@ dependencies = [
  "embassy-sync 0.6.0",
  "embassy-time",
  "heapless",
+ "log",
 ]
 
 [[package]]

@@ -577,16 +577,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "esp-hal-dhcp"
+version = "0.1.0"
+dependencies = [
+ "edge-dhcp",
+ "embassy-futures",
+ "embassy-net",
+ "embassy-sync 0.6.0",
+ "embassy-time",
+ "heapless",
+ "log",
+]
+
+[[package]]
 name = "esp-hal-dhcp-example"
 version = "0.1.0"
 dependencies = [
  "dotenvy",
- "edge-dhcp",
  "embassy-executor",
  "embassy-net",
  "embassy-time",
  "esp-backtrace",
  "esp-hal",
+ "esp-hal-dhcp",
  "esp-hal-embassy",
  "esp-println",
  "esp-wifi",

@@ -12,3 +12,4 @@ embassy-net = { version = "0.4.0", features = ["medium-ethernet", "proto-ipv4", 
 embassy-sync = "0.6.0"
 embassy-time = "0.3.2"
 heapless = { version = "0.8.0", default-features = false }
+log = "0.4.22"

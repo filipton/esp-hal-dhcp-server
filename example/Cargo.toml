@@ -23,7 +23,7 @@ embassy-executor = { version = "0.5.0", features = ["task-arena-size-16384"] }
 embassy-net = { version = "0.4.0", features = ["tcp", "udp", "medium-ethernet", "dhcpv4"] }
 static_cell = "2.1.0"
 embassy-time = "0.3.2"
-edge-dhcp = { version = "0.2.0", default-features = false }
+esp-hal-dhcp = { path = "../" }
 [profile.dev]
 # Rust debug is too slow.
 # For debug builds always builds with some optimization
