@@ -36,7 +36,7 @@ pub async fn run_dhcp_server<D: Driver>(
     );
 
     let mut server = DhcpServer::new(config, leaser, sock);
-    embassy_futures::join::join(server.run(), CLOSE_SIGNAL.wait()).await;
+    embassy_futures::select::select(server.run(), CLOSE_SIGNAL.wait()).await;
 }
 
 pub fn dhcp_close() {
