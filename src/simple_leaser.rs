@@ -2,7 +2,6 @@ use crate::structs::{DhcpLease, DhcpLeaser};
 use edge_dhcp::Ipv4Addr;
 use embassy_time::Instant;
 
-// TODO: maybe use embassy ipv4 (with custom ->u32 iplementation)
 pub struct SimpleDhcpLeaser {
     pub start: Ipv4Addr,
     pub end: Ipv4Addr,
@@ -56,5 +55,33 @@ impl DhcpLeaser for SimpleDhcpLeaser {
         }
 
         false
+    }
+}
+
+pub struct SingleDhcpLeaser {
+    pub ip: Ipv4Addr,
+}
+
+impl SingleDhcpLeaser {
+    pub fn new(ip: Ipv4Addr) -> Self {
+        Self { ip }
+    }
+}
+
+impl DhcpLeaser for SingleDhcpLeaser {
+    fn get_lease(&mut self, _mac: [u8; 16]) -> Option<DhcpLease> {
+        None
+    }
+
+    fn next_lease(&mut self) -> Option<Ipv4Addr> {
+        Some(self.ip)
+    }
+
+    fn add_lease(&mut self, _ip: Ipv4Addr, _mac: [u8; 16], _expires: Instant) -> bool {
+        true
+    }
+
+    fn remove_lease(&mut self, _mac: [u8; 16]) -> bool {
+        true
     }
 }

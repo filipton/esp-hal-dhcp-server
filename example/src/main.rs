@@ -11,7 +11,11 @@ use esp_hal::{
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
-use esp_hal_dhcp::{simple_leaser::SimpleDhcpLeaser, structs::DhcpServerConfig, Ipv4Addr};
+use esp_hal_dhcp::{
+    simple_leaser::{SimpleDhcpLeaser, SingleDhcpLeaser},
+    structs::DhcpServerConfig,
+    Ipv4Addr,
+};
 use esp_wifi::{
     initialize,
     wifi::{
@@ -110,11 +114,14 @@ async fn dhcp_server(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
         dns: &[],
     };
 
+    /*
     let mut leaser = SimpleDhcpLeaser {
         start: Ipv4Addr::new(192, 168, 2, 50),
         end: Ipv4Addr::new(192, 168, 2, 200),
         leases: Default::default(),
     };
+    */
+    let mut leaser = SingleDhcpLeaser::new(Ipv4Addr::new(192, 168, 2, 69));
 
     esp_hal_dhcp::run_dhcp_server(stack, config, &mut leaser).await;
 }
