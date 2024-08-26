@@ -11,7 +11,7 @@ use esp_hal::{
     system::SystemControl,
     timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
 };
-use esp_hal_dhcp::{DhcpServerConfig, Ipv4Addr, SimpleDhcpLeaser};
+use esp_hal_dhcp::{simple_leaser::SimpleDhcpLeaser, structs::DhcpServerConfig, Ipv4Addr};
 use esp_wifi::{
     initialize,
     wifi::{
@@ -97,7 +97,7 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     Timer::after(Duration::from_secs(120)).await;
     log::info!("Closing dhcp server after 2m...");
-    esp_hal_dhcp::CLOSE_SIGNAL.signal(());
+    esp_hal_dhcp::dhcp_close();
 }
 
 #[embassy_executor::task]
