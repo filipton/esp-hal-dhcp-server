@@ -257,7 +257,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "esp-hal-dhcp"
+name = "esp-hal-dhcp-server"
 version = "0.1.0"
 dependencies = [
  "edge-dhcp",

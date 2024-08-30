@@ -1,7 +1,10 @@
 [package]
-name = "esp-hal-dhcp"
+name = "esp-hal-dhcp-server"
 version = "0.1.0"
+authors = ["filipton <filipton12@gmail.com>"]
 edition = "2021"
+license = "MIT"
+description = "A simple DHCP server for embassy-net (main target is esp-hal)"
 
 [lib]
 
