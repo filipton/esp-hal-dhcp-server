@@ -1,23 +1,17 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
 use embassy_net::{Config, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{
-    clock::ClockControl,
-    peripherals::Peripherals,
-    prelude::*,
-    system::SystemControl,
-    timer::{timg::TimerGroup, ErasedTimer, OneShotTimer},
-};
-use esp_hal_dhcp::{
+use esp_hal::{prelude::*, timer::timg::TimerGroup};
+use esp_hal_dhcp_server::{
     simple_leaser::{SimpleDhcpLeaser, SingleDhcpLeaser},
     structs::DhcpServerConfig,
     Ipv4Addr,
 };
 use esp_wifi::{
-    initialize,
     wifi::{
         AccessPointConfiguration, Configuration, WifiApDevice, WifiController, WifiDevice,
         WifiEvent, WifiState,
@@ -36,31 +30,20 @@ macro_rules! mk_static {
 
 #[main]
 async fn main(spawner: embassy_executor::Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
+    esp_alloc::heap_allocator!(150 * 1024);
 
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let peripherals = esp_hal::init(esp_hal::Config::default());
 
     esp_println::logger::init_logger_from_env();
-    let timg1 = TimerGroup::new(peripherals.TIMG1, &clocks, None);
-    let timer0 = OneShotTimer::new(timg1.timer0.into());
-    let timers = [timer0];
-    let timers: &mut [OneShotTimer<ErasedTimer>; 1] =
-        mk_static!([OneShotTimer<ErasedTimer>; 1], timers);
-    esp_hal_embassy::init(&clocks, timers);
+    let timg1 = TimerGroup::new(peripherals.TIMG1);
+    esp_hal_embassy::init(timg1.timer0);
 
-    let timer = esp_hal::timer::PeriodicTimer::new(
-        esp_hal::timer::timg::TimerGroup::new(peripherals.TIMG0, &clocks, None)
-            .timer0
-            .into(),
-    );
-
-    let init = initialize(
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let init = esp_wifi::init(
         EspWifiInitFor::Wifi,
-        timer,
+        timg0.timer0,
         esp_hal::rng::Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
-        &clocks,
     )
     .unwrap();
 
@@ -101,7 +84,7 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     Timer::after(Duration::from_secs(120)).await;
     log::info!("Closing dhcp server after 2m...");
-    esp_hal_dhcp::dhcp_close();
+    esp_hal_dhcp_server::dhcp_close();
 }
 
 #[embassy_executor::task]
@@ -123,7 +106,7 @@ async fn dhcp_server(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
     */
     let mut leaser = SingleDhcpLeaser::new(Ipv4Addr::new(192, 168, 2, 69));
 
-    esp_hal_dhcp::run_dhcp_server(stack, config, &mut leaser).await;
+    esp_hal_dhcp_server::run_dhcp_server(stack, config, &mut leaser).await;
 }
 
 #[embassy_executor::task]

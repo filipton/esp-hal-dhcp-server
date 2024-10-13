@@ -6,24 +6,25 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-esp-backtrace = { version = "0.13.0", features = [
+esp-backtrace = { version = "0.14.2", features = [
     "esp32s3",
     "exception-handler",
     "panic-handler",
     "println",
 ] }
-esp-hal = { version = "0.19.0", features = [ "esp32s3", "async" ] }
-esp-println = { version = "0.10.0", features = ["esp32s3", "log"] }
+esp-hal = { version = "0.21.0", features = [ "esp32s3" ] }
+esp-println = { version = "0.12.0", features = ["esp32s3", "log"] }
 log = { version = "0.4.22" }
 #esp-wifi = { version = "0.7.1", features = ["async", "dump-packets", "embassy-net", "esp32s3", "phy-enable-usb", "utils", "wifi", "wifi-default"] }
-esp-wifi = { version = "0.7.1", features = ["async", "embassy-net", "esp32s3", "phy-enable-usb", "utils", "wifi", "wifi-default"] }
+esp-wifi = { version = "0.10.1", features = ["async", "embassy-net", "esp32s3", "phy-enable-usb", "utils", "wifi", "wifi-default"] }
 heapless = { version = "0.8.0", default-features = false }
-esp-hal-embassy = { version = "0.2.0", features = ["esp32s3", "integrated-timers"] }
-embassy-executor = { version = "0.5.0", features = ["task-arena-size-16384"] }
+esp-hal-embassy = { version = "0.4.0", features = ["esp32s3", "integrated-timers"] }
+embassy-executor = { version = "0.6.0", features = ["task-arena-size-16384"] }
 embassy-net = { version = "0.4.0", features = ["tcp", "udp", "medium-ethernet", "dhcpv4"] }
 static_cell = "2.1.0"
 embassy-time = "0.3.2"
-esp-hal-dhcp = { path = "../" }
+esp-hal-dhcp-server = { path = "../" }
+esp-alloc = "0.5.0"
 [profile.dev]
 # Rust debug is too slow.
 # For debug builds always builds with some optimization
