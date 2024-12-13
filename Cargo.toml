@@ -1,6 +1,6 @@
 [package]
 name = "esp-hal-dhcp-server"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["filipton <filipton12@gmail.com>"]
 edition = "2021"
 license = "MIT"
@@ -12,8 +12,8 @@ repository = "https://github.com/filipton/esp-hal-dhcp-server"
 [dependencies]
 edge-dhcp = { version = "0.3.0", default-features = false }
 embassy-futures = "0.1.1"
-embassy-net = { version = "0.4.0", features = ["medium-ethernet", "proto-ipv4", "udp"] }
-embassy-sync = "0.6.0"
+embassy-net = { version = "0.5.0", features = ["medium-ethernet", "proto-ipv4", "udp"] }
+embassy-sync = "0.6.1"
 embassy-time = "0.3.2"
 heapless = { version = "0.8.0", default-features = false }
 log = "0.4.22"

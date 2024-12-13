@@ -2,7 +2,7 @@
 #![no_main]
 
 extern crate alloc;
-use embassy_net::{Config, Ipv4Address, Ipv4Cidr, Stack, StackResources, StaticConfigV4};
+use embassy_net::{Config, Ipv4Address, Ipv4Cidr, Runner, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{prelude::*, timer::timg::TimerGroup};
@@ -53,24 +53,21 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     let config = Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
-        gateway: Some(Ipv4Address::from_bytes(&[192, 168, 2, 1])),
+        gateway: Some(Ipv4Address::new(192, 168, 2, 1)),
         dns_servers: Default::default(),
     });
     let seed = 1234; // very random, very secure seed
 
     // Init network stack
-    let stack = &*mk_static!(
-        Stack<WifiDevice<'_, WifiApDevice>>,
-        Stack::new(
-            wifi_interface,
-            config,
-            mk_static!(StackResources<3>, StackResources::<3>::new()),
-            seed
-        )
+    let (stack, ap_runner) = embassy_net::new(
+        wifi_interface,
+        config,
+        mk_static!(StackResources<3>, StackResources::<3>::new()),
+        seed,
     );
 
     spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(&stack)).ok();
+    spawner.spawn(net_task(ap_runner)).ok();
 
     loop {
         if stack.is_link_up() {
@@ -88,7 +85,7 @@ async fn main(spawner: embassy_executor::Spawner) {
 }
 
 #[embassy_executor::task]
-async fn dhcp_server(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
+async fn dhcp_server(stack: Stack<'static>) {
     let config = DhcpServerConfig {
         ip: Ipv4Addr::new(192, 168, 2, 1),
         lease_time: Duration::from_secs(3600),
@@ -136,6 +133,6 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
-    stack.run().await
+async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiApDevice>>) {
+    runner.run().await
 }

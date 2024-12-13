@@ -5,7 +5,6 @@ extern crate alloc;
 
 pub use edge_dhcp::Ipv4Addr;
 use embassy_net::{
-    driver::Driver,
     udp::{PacketMetadata, UdpSocket},
     Stack,
 };
@@ -22,8 +21,8 @@ pub type CloseSignal = Signal<CriticalSectionRawMutex, ()>;
 pub static CLOSE_SIGNAL: CloseSignal = Signal::new();
 
 #[cfg(not(feature = "alloc"))]
-pub async fn run_dhcp_server<D: Driver>(
-    stack: &'static Stack<D>,
+pub async fn run_dhcp_server(
+    stack: Stack<'static>,
     config: DhcpServerConfig<'_>,
     leaser: &'_ mut dyn DhcpLeaser,
 ) {
@@ -32,7 +31,7 @@ pub async fn run_dhcp_server<D: Driver>(
     let mut rx_meta = [PacketMetadata::EMPTY; 16];
     let mut tx_meta = [PacketMetadata::EMPTY; 16];
     let sock = UdpSocket::new(
-        &stack,
+        stack,
         &mut rx_meta,
         &mut rx_buffer,
         &mut tx_meta,
@@ -43,10 +42,9 @@ pub async fn run_dhcp_server<D: Driver>(
     embassy_futures::select::select(server.run(), CLOSE_SIGNAL.wait()).await;
 }
 
-
 #[cfg(feature = "alloc")]
-pub async fn run_dhcp_server<D: Driver>(
-    stack: alloc::rc::Rc<Stack<D>>,
+pub async fn run_dhcp_server(
+    stack: alloc::rc::Rc<Stack<'_>>,
     config: DhcpServerConfig<'_>,
     leaser: &'_ mut dyn DhcpLeaser,
 ) {

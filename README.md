@@ -22,7 +22,7 @@ esp_hal_dhcp::dhcp_close();
 
 // ...
 #[embassy_executor::task]
-async fn dhcp_server(stack: &'static Stack<WifiDevice<'static, WifiApDevice>>) {
+async fn dhcp_server(stack: Stack<'static>) {
     let config = DhcpServerConfig {
         ip: Ipv4Addr::new(192, 168, 2, 1),
         lease_time: Duration::from_secs(3600),
