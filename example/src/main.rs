@@ -77,6 +77,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     }
 
     log::info!("Connect to ap");
+    let s = stack.clone();
     spawner.spawn(dhcp_server(stack)).ok();
 
     Timer::after(Duration::from_secs(120)).await;
