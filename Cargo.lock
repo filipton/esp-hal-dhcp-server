@@ -37,12 +37,11 @@ dependencies = [
 
 [[package]]
 name = "edge-dhcp"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b68d2c31cfa4d4bb4a8647ccf9469912164b975c063fc9a25f8ef19c53b1b6"
+checksum = "d8b1761ef371a52e49015be37af0388ff0b2de1d87ddc3cf3ca57f7e15ad014a"
 dependencies = [
  "edge-raw",
- "embassy-time",
  "heapless",
  "log",
  "num_enum",
@@ -51,9 +50,9 @@ dependencies = [
 
 [[package]]
 name = "edge-raw"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0cd56f6f142c3f9076b954b3f104e3c0e1145003a392e8f58285e14ecd937aa6"
+checksum = "47a19f7f3e0a90e4945f11d739f873a269d34dc819b6f0b6548478b037c17a75"
 dependencies = [
  "log",
 ]
