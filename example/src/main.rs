@@ -5,18 +5,19 @@ extern crate alloc;
 use embassy_net::{Config, Ipv4Address, Ipv4Cidr, Runner, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
-use esp_hal::{prelude::*, timer::timg::TimerGroup};
+use esp_hal::timer::timg::TimerGroup;
 use esp_hal_dhcp_server::{
     simple_leaser::{SimpleDhcpLeaser, SingleDhcpLeaser},
     structs::DhcpServerConfig,
     Ipv4Addr,
 };
+use esp_hal_embassy::main;
 use esp_wifi::{
     wifi::{
         AccessPointConfiguration, Configuration, WifiApDevice, WifiController, WifiDevice,
         WifiEvent, WifiState,
     },
-    EspWifiInitFor,
+    EspWifiController,
 };
 
 macro_rules! mk_static {
@@ -40,12 +41,12 @@ async fn main(spawner: embassy_executor::Spawner) {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let init = esp_wifi::init(
-        EspWifiInitFor::Wifi,
         timg0.timer0,
         esp_hal::rng::Rng::new(peripherals.RNG),
         peripherals.RADIO_CLK,
     )
     .unwrap();
+    let init = &*mk_static!(EspWifiController<'static>, init);
 
     let wifi = peripherals.WIFI;
     let (wifi_interface, controller) =
@@ -77,7 +78,6 @@ async fn main(spawner: embassy_executor::Spawner) {
     }
 
     log::info!("Connect to ap");
-    let s = stack.clone();
     spawner.spawn(dhcp_server(stack)).ok();
 
     Timer::after(Duration::from_secs(120)).await;
@@ -90,9 +90,9 @@ async fn dhcp_server(stack: Stack<'static>) {
     let config = DhcpServerConfig {
         ip: Ipv4Addr::new(192, 168, 2, 1),
         lease_time: Duration::from_secs(3600),
-        gateways: &[],
+        gateways: &[Ipv4Addr::new(192, 168, 2, 1)],
         subnet: None,
-        dns: &[],
+        dns: &[Ipv4Addr::new(192, 168, 2, 1)],
     };
 
     /*
@@ -104,15 +104,18 @@ async fn dhcp_server(stack: Stack<'static>) {
     */
     let mut leaser = SingleDhcpLeaser::new(Ipv4Addr::new(192, 168, 2, 69));
 
-    esp_hal_dhcp_server::run_dhcp_server(stack, config, &mut leaser).await;
+    let res = esp_hal_dhcp_server::run_dhcp_server(stack, config, &mut leaser).await;
+    if let Err(e) = res {
+        log::error!("DHCP SERVER ERROR: {e:?}");
+    }
 }
 
 #[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) {
     log::info!("start connection task");
-    log::info!("Device capabilities: {:?}", controller.get_capabilities());
+    log::info!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_wifi::wifi::get_wifi_state() {
+        match esp_wifi::wifi::wifi_state() {
             WifiState::ApStarted => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::ApStop).await;
@@ -127,7 +130,7 @@ async fn connection(mut controller: WifiController<'static>) {
             });
             controller.set_configuration(&client_config).unwrap();
             log::info!("Starting wifi");
-            controller.start().await.unwrap();
+            controller.start_async().await.unwrap();
             log::info!("Wifi started!");
         }
     }

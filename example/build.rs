@@ -1,6 +1,6 @@
 fn main() {
     println!("cargo:rustc-link-arg-bins=-Tlinkall.x");
-    println!("cargo:rustc-link-arg-bins=-Trom_functions.x");
+    //println!("cargo:rustc-link-arg-bins=-Trom_functions.x");
 
     println!("cargo:rerun-if-changed=*.env*");
     if let Ok(mut iter) = dotenvy::dotenv_iter() {

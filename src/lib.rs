@@ -2,7 +2,7 @@
 
 pub use edge_dhcp::Ipv4Addr;
 use embassy_net::{
-    udp::{PacketMetadata, UdpSocket},
+    udp::{BindError, PacketMetadata, UdpSocket},
     Stack,
 };
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
@@ -21,7 +21,7 @@ pub async fn run_dhcp_server(
     stack: Stack<'static>,
     config: DhcpServerConfig<'_>,
     leaser: &'_ mut dyn DhcpLeaser,
-) {
+) -> Result<(), BindError> {
     let mut rx_buffer = [0; 1024];
     let mut tx_buffer = [0; 1024];
     let mut rx_meta = [PacketMetadata::EMPTY; 16];
@@ -34,8 +34,9 @@ pub async fn run_dhcp_server(
         &mut tx_buffer,
     );
 
-    let mut server = DhcpServer::new(config, leaser, sock);
+    let mut server = DhcpServer::new(config, leaser, sock)?;
     embassy_futures::select::select(server.run(), CLOSE_SIGNAL.wait()).await;
+    Ok(())
 }
 
 pub fn dhcp_close() {

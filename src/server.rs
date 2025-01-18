@@ -1,5 +1,5 @@
 use edge_dhcp::{server::Action, DhcpOption, Ipv4Addr, MessageType, Options, Packet};
-use embassy_net::udp::UdpSocket;
+use embassy_net::udp::{BindError, UdpSocket};
 use embassy_time::Instant;
 
 use crate::structs::{
@@ -18,22 +18,23 @@ impl<'a> DhcpServer<'a> {
         config: DhcpServerConfig<'a>,
         leaser: &'a mut dyn DhcpLeaser,
         mut sock: UdpSocket<'a>,
-    ) -> Self {
-        sock.bind(DHCP_SERVER_ENDPOINT).unwrap();
+    ) -> Result<Self, BindError> {
+        sock.bind(DHCP_SERVER_ENDPOINT)?;
 
-        Self {
+        Ok(Self {
             config,
             leaser,
             sock,
-        }
+        })
     }
 
     pub async fn run(&mut self) {
         let mut buf = [0; DHCP_BUFFER_SIZE];
         loop {
             let res = self.sock.recv_from(&mut buf).await;
-            if let Ok((n, addr)) = res {
-                log::info!("received {n} from {addr:?}");
+            if let Ok((n, _addr)) = res {
+                #[cfg(feature = "log")]
+                log::info!("received {n} from {_addr:?}");
 
                 let res = Packet::decode(&buf[..n]);
                 if let Ok(packet) = res {
@@ -44,7 +45,11 @@ impl<'a> DhcpServer<'a> {
     }
 
     async fn process_packet(&mut self, packet: Packet<'_>) {
-        let action = self.get_packet_action(&packet).unwrap();
+        let Some(action) = self.get_packet_action(&packet) else {
+            #[cfg(feature = "log")]
+            log::warn!("Skipping process_packet because packet action was None");
+            return;
+        };
 
         match action {
             Action::Discover(requested_ip, mac) => {
@@ -123,12 +128,14 @@ impl<'a> DhcpServer<'a> {
         match bytes_res {
             Ok(bytes) => {
                 let res = self.sock.send_to(bytes, DHCP_BROADCAST).await;
-                if let Err(e) = res {
-                    log::error!("Dhcp sock send error: {e:?}");
+                if let Err(_e) = res {
+                    #[cfg(feature = "log")]
+                    log::error!("Dhcp sock send error: {_e:?}");
                 }
             }
-            Err(e) => {
-                log::error!("Dhcp encode error: {e:?}");
+            Err(_e) => {
+                #[cfg(feature = "log")]
+                log::error!("Dhcp encode error: {_e:?}");
             }
         }
     }
@@ -144,6 +151,7 @@ impl<'a> DhcpServer<'a> {
         });
 
         let message_type = message_type.or_else(|| {
+            #[cfg(feature = "log")]
             log::warn!("Ignoring DHCP request, no message type found: {packet:?}");
             None
         })?;
@@ -154,6 +162,7 @@ impl<'a> DhcpServer<'a> {
         });
 
         if server_identifier.is_some() && server_identifier != Some(self.config.ip) {
+            #[cfg(feature = "log")]
             log::warn!("Ignoring {message_type} request, not addressed to this server: {packet:?}");
             return None;
         }
