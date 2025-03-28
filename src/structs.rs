@@ -28,4 +28,6 @@ pub struct DhcpServerConfig<'a> {
     pub gateways: &'a [Ipv4Addr],
     pub subnet: Option<Ipv4Addr>,
     pub dns: &'a [Ipv4Addr],
+
+    pub use_captive_portal: bool,
 }

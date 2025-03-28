@@ -93,6 +93,7 @@ async fn dhcp_server(stack: Stack<'static>) {
         gateways: &[Ipv4Addr::new(192, 168, 2, 1)],
         subnet: None,
         dns: &[Ipv4Addr::new(192, 168, 2, 1)],
+        use_captive_portal: true,
     };
 
     /*

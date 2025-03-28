@@ -98,16 +98,18 @@ impl<'a> DhcpServer<'a> {
     async fn send_reply(&mut self, packet: Packet<'_>, mt: MessageType, ip: Option<Ipv4Addr>) {
         let mut opt_buf = Options::buf();
 
-        /*
         let mut captive_portal: heapless::String<64> = heapless::String::new();
-        let captive_portal = match core::fmt::write(
-            &mut captive_portal,
-            format_args!("http://{}", self.config.ip),
-        ) {
-            Ok(_) => Some(captive_portal.as_str()),
-            Err(_) => None,
+        let captive_portal = if self.config.use_captive_portal {
+            match core::fmt::write(
+                &mut captive_portal,
+                format_args!("http://{}", self.config.ip),
+            ) {
+                Ok(_) => Some(captive_portal.as_str()),
+                Err(_) => None,
+            }
+        } else {
+            None
         };
-        */
 
         let reply = packet.new_reply(
             ip,
@@ -118,7 +120,7 @@ impl<'a> DhcpServer<'a> {
                 self.config.gateways,
                 self.config.subnet,
                 self.config.dns,
-                None,
+                captive_portal,
                 &mut opt_buf,
             ),
         );

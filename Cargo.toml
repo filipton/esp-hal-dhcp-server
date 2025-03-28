@@ -1,6 +1,6 @@
 [package]
 name = "esp-hal-dhcp-server"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["filipton <filipton12@gmail.com>"]
 edition = "2021"
 license = "MIT"
@@ -16,7 +16,7 @@ embassy-net = { version = "0.6.0", features = ["medium-ethernet", "proto-ipv4", 
 embassy-sync = "0.6.2"
 embassy-time = "0.4.0"
 heapless = { version = "0.8.0", default-features = false }
-log = { version = "0.4.25", optional = true }
+log = { version = "0.4.27", optional = true }
 
 [features]
 default = ["log"]
