@@ -4,6 +4,11 @@ Simple dhcp server for embassy tested on esp-hal (esp32-s3 - WiFiAP with android
 [![crates.io](https://img.shields.io/crates/v/esp-hal-dhcp-server.svg)](https://crates.io/crates/esp-hal-dhcp-server)
 [![MIT license](https://img.shields.io/github/license/mashape/apistatus.svg)]()
 
+> **Recommended:** use the DHCP server built into [`edge-dhcp`](https://crates.io/crates/edge-dhcp)
+> (`edge_dhcp::io::server::run`, with [`edge-nal-embassy`](https://crates.io/crates/edge-nal-embassy)) instead.
+> It does everything this crate does (lease reuse, range checks, captive portal option) and is more complete.
+> This crate stays available but is no longer actively developed.
+
 ## Example
 To see full example look inside `./example` dir, you can cd into it and run it as normal crate
 
