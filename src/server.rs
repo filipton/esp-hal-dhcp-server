@@ -34,7 +34,7 @@ impl<'a> DhcpServer<'a> {
             let res = self.sock.recv_from(&mut buf).await;
             if let Ok((n, _addr)) = res {
                 #[cfg(feature = "log")]
-                log::info!("received {n} from {_addr:?}");
+                log::debug!("received {n} from {_addr:?}");
 
                 let res = Packet::decode(&buf[..n]);
                 if let Ok(packet) = res {
@@ -52,17 +52,13 @@ impl<'a> DhcpServer<'a> {
         };
 
         match action {
-            Action::Discover(requested_ip, mac) => {
-                let ip = requested_ip
-                    .and_then(|ip| {
-                        let mac_lease = self.leaser.get_lease(*mac);
-                        let available = mac_lease
-                            .map(|d| d.ip == ip || Instant::now() > d.expires)
-                            .unwrap_or(true);
-
-                        available.then_some(ip)
-                    })
-                    .or_else(|| self.leaser.get_lease(*mac).map(|l| l.ip))
+            Action::Discover(_requested_ip, mac) => {
+                // A requested address may belong to another network or client; the leaser only
+                // vouches for the client's own lease and its next free address.
+                let ip = self
+                    .leaser
+                    .get_lease(*mac)
+                    .map(|l| l.ip)
                     .or_else(|| self.leaser.next_lease());
 
                 if ip.is_some() {
@@ -97,6 +93,7 @@ impl<'a> DhcpServer<'a> {
 
     async fn send_reply(&mut self, packet: Packet<'_>, mt: MessageType, ip: Option<Ipv4Addr>) {
         let mut opt_buf = Options::buf();
+        let lease_secs = u32::try_from(self.config.lease_time.as_secs()).unwrap_or(u32::MAX);
 
         let mut captive_portal: heapless::String<64> = heapless::String::new();
         let captive_portal = if self.config.use_captive_portal {
@@ -116,7 +113,7 @@ impl<'a> DhcpServer<'a> {
             packet.options.reply(
                 mt,
                 self.config.ip,
-                self.config.lease_time.as_secs() as u32,
+                lease_secs,
                 self.config.gateways,
                 self.config.subnet,
                 self.config.dns,

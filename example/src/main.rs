@@ -7,7 +7,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal_dhcp_server::{
-    simple_leaser::{SimpleDhcpLeaser, SingleDhcpLeaser},
+    simple_leaser::SimpleDhcpLeaser,
     structs::DhcpServerConfig,
     Ipv4Addr,
 };
@@ -89,14 +89,12 @@ async fn dhcp_server(stack: Stack<'static>) {
         use_captive_portal: true,
     };
 
-    /*
+    // or `SingleDhcpLeaser::new(ip)` to always hand out one address
     let mut leaser = SimpleDhcpLeaser {
         start: Ipv4Addr::new(192, 168, 2, 50),
         end: Ipv4Addr::new(192, 168, 2, 200),
         leases: Default::default(),
     };
-    */
-    let mut leaser = SingleDhcpLeaser::new(Ipv4Addr::new(192, 168, 2, 69));
 
     let res = esp_hal_dhcp_server::run_dhcp_server(stack, config, &mut leaser).await;
     if let Err(e) = res {

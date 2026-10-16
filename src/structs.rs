@@ -13,9 +13,13 @@ pub struct DhcpLease {
     pub expires: Instant,
 }
 
+/// Address allocation strategy used by the server.
 pub trait DhcpLeaser {
+    /// The lease currently recorded for `mac` (it may be expired).
     fn get_lease(&mut self, mac: [u8; 16]) -> Option<DhcpLease>;
+    /// A free address to offer to a new client, if any.
     fn next_lease(&mut self) -> Option<Ipv4Addr>;
+    /// Records a lease; `false` makes the server answer the request with NAK.
     fn add_lease(&mut self, ip: Ipv4Addr, mac: [u8; 16], expires: Instant) -> bool;
     fn remove_lease(&mut self, mac: [u8; 16]) -> bool;
 }

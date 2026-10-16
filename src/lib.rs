@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 pub use edge_dhcp::Ipv4Addr;
 use embassy_net::{
@@ -15,8 +15,12 @@ pub mod simple_leaser;
 pub mod structs;
 
 pub type CloseSignal = Signal<CriticalSectionRawMutex, ()>;
+/// Signalled by [`dhcp_close`] to stop the running [`run_dhcp_server`].
 pub static CLOSE_SIGNAL: CloseSignal = Signal::new();
 
+/// Runs a DHCP server on `stack` until [`dhcp_close`] is called.
+///
+/// Returns an error only if the UDP socket cannot bind port 67.
 pub async fn run_dhcp_server(
     stack: Stack<'static>,
     config: DhcpServerConfig<'_>,
@@ -34,11 +38,14 @@ pub async fn run_dhcp_server(
         &mut tx_buffer,
     );
 
+    // a close requested while no server was running must not stop this one
+    CLOSE_SIGNAL.reset();
     let mut server = DhcpServer::new(config, leaser, sock)?;
     embassy_futures::select::select(server.run(), CLOSE_SIGNAL.wait()).await;
     Ok(())
 }
 
+/// Stops the running [`run_dhcp_server`].
 pub fn dhcp_close() {
     CLOSE_SIGNAL.signal(());
 }

@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "esp-hal-dhcp-server"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "edge-dhcp",
  "embassy-futures",
