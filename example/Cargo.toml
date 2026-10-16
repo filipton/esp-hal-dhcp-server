@@ -6,25 +6,23 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-esp-backtrace = { version = "0.15.0", features = [
+esp-backtrace = { version = "0.20.0", features = [
     "esp32s3",
-    "exception-handler",
     "panic-handler",
     "println",
 ] }
-esp-hal = { version = "0.23.1", features = [ "esp32s3" ] }
-esp-println = { version = "0.13.0", features = ["esp32s3", "log"] }
-log = { version = "0.4.27" }
-#esp-wifi = { version = "0.7.1", features = ["async", "dump-packets", "embassy-net", "esp32s3", "phy-enable-usb", "utils", "wifi", "wifi-default"] }
-esp-wifi = { version = "0.12.0", features = ["esp32s3", "utils", "wifi"] }
-heapless = { version = "0.8.0", default-features = false }
-esp-hal-embassy = { version = "0.6.0", features = ["esp32s3"] }
-embassy-executor = { version = "0.7.0", features = ["task-arena-size-16384"] }
-embassy-net = { version = "0.7.0", features = ["tcp", "udp", "medium-ethernet", "dhcpv4"] }
-static_cell = "2.1.0"
-embassy-time = "0.4.0"
+esp-hal = { version = "1.2.2", features = ["esp32s3", "unstable"] }
+esp-println = { version = "0.18.0", features = ["esp32s3", "log-04"] }
+log = { version = "0.4.34" }
+esp-radio = { version = "1.0.0-beta.1", features = ["esp32s3", "wifi", "log-04"] }
+esp-rtos = { version = "0.4.0", features = ["esp32s3", "embassy", "esp-radio"] }
+esp-bootloader-esp-idf = { version = "0.6.0", features = ["esp32s3"] }
+embassy-executor = { version = "0.10.0" }
+embassy-net = { version = "0.9.1", features = ["tcp", "udp", "medium-ethernet", "dhcpv4"] }
+static_cell = "2.1.1"
+embassy-time = "0.5.1"
 esp-hal-dhcp-server = { path = "../", default-features = false, features = ["log"] }
-esp-alloc = "0.6.0"
+esp-alloc = "0.11.0"
 [profile.dev]
 # Rust debug is too slow.
 # For debug builds always builds with some optimization

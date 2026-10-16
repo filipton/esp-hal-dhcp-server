@@ -10,14 +10,14 @@ To see full example look inside `./example` dir, you can cd into it and run it a
 ```rust
 // ...
 // spawn your dhcp_server task
-spawner.spawn(dhcp_server(stack)).ok();
+spawner.spawn(dhcp_server(stack).unwrap());
 
 log::info!("Closing dhcp server after 2m...");
 Timer::after(Duration::from_secs(120)).await;
 log::info!("Closing dhcp server...");
 
 // you can close your server using builtin SIGNAL
-esp_hal_dhcp::dhcp_close();
+esp_hal_dhcp_server::dhcp_close();
 // ...
 
 // ...
@@ -29,6 +29,7 @@ async fn dhcp_server(stack: Stack<'static>) {
         gateways: &[],
         subnet: None,
         dns: &[],
+        use_captive_portal: false,
     };
 
     let mut leaser = SimpleDhcpLeaser {
@@ -36,6 +37,6 @@ async fn dhcp_server(stack: Stack<'static>) {
         end: Ipv4Addr::new(192, 168, 2, 200),
         leases: Default::default(),
     };
-    esp_hal_dhcp::run_dhcp_server(stack, config, &mut leaser).await;
+    let _ = esp_hal_dhcp_server::run_dhcp_server(stack, config, &mut leaser).await;
 }
 ```

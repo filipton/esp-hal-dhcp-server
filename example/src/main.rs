@@ -11,14 +11,9 @@ use esp_hal_dhcp_server::{
     structs::DhcpServerConfig,
     Ipv4Addr,
 };
-use esp_hal_embassy::main;
-use esp_wifi::{
-    wifi::{
-        AccessPointConfiguration, Configuration, WifiApDevice, WifiController, WifiDevice,
-        WifiEvent, WifiState,
-    },
-    EspWifiController,
-};
+use esp_radio::wifi::{ap::AccessPointConfig, Config as WifiConfig, ControllerConfig, Interface, WifiController};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 macro_rules! mk_static {
     ($t:ty,$val:expr) => {{
@@ -29,28 +24,26 @@ macro_rules! mk_static {
     }};
 }
 
-#[main]
+#[esp_hal::main]
 async fn main(spawner: embassy_executor::Spawner) {
-    esp_alloc::heap_allocator!(150 * 1024);
+    esp_alloc::heap_allocator!(size: 150 * 1024);
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     esp_println::logger::init_logger_from_env();
-    let timg1 = TimerGroup::new(peripherals.TIMG1);
-    esp_hal_embassy::init(timg1.timer0);
-
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let init = esp_wifi::init(
-        timg0.timer0,
-        esp_hal::rng::Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
+    esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
+
+    let ap_config = WifiConfig::AccessPoint(
+        AccessPointConfig::default().with_ssid("esp-radio".try_into().unwrap()),
+    );
+    let wifi_interface = Interface::access_point();
+    let controller = WifiController::new(
+        peripherals.WIFI,
+        ControllerConfig::default().with_initial_config(ap_config),
     )
     .unwrap();
-    let init = &*mk_static!(EspWifiController<'static>, init);
-
-    let wifi = peripherals.WIFI;
-    let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(&init, wifi, WifiApDevice).unwrap();
+    log::info!("Wifi started!");
 
     let config = Config::ipv4_static(StaticConfigV4 {
         address: Ipv4Cidr::new(Ipv4Address::new(192, 168, 2, 1), 24),
@@ -67,8 +60,8 @@ async fn main(spawner: embassy_executor::Spawner) {
         seed,
     );
 
-    spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(ap_runner)).ok();
+    spawner.spawn(connection(controller).unwrap());
+    spawner.spawn(net_task(ap_runner).unwrap());
 
     loop {
         if stack.is_link_up() {
@@ -78,7 +71,7 @@ async fn main(spawner: embassy_executor::Spawner) {
     }
 
     log::info!("Connect to ap");
-    spawner.spawn(dhcp_server(stack)).ok();
+    spawner.spawn(dhcp_server(stack).unwrap());
 
     Timer::after(Duration::from_secs(120)).await;
     log::info!("Closing dhcp server after 2m...");
@@ -112,32 +105,22 @@ async fn dhcp_server(stack: Stack<'static>) {
 }
 
 #[embassy_executor::task]
-async fn connection(mut controller: WifiController<'static>) {
+async fn connection(controller: WifiController<'static>) {
     log::info!("start connection task");
-    log::info!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_wifi::wifi::wifi_state() {
-            WifiState::ApStarted => {
-                // wait until we're no longer connected
-                controller.wait_for_event(WifiEvent::ApStop).await;
-                Timer::after(Duration::from_millis(5000)).await
+        match controller.wait_for_access_point_connected_event_async().await {
+            Ok(esp_radio::wifi::ap::EventInfo::Connected(info)) => {
+                log::info!("Station connected: {info:?}")
             }
-            _ => {}
-        }
-        if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-                ssid: "esp-wifi".try_into().unwrap(),
-                ..Default::default()
-            });
-            controller.set_configuration(&client_config).unwrap();
-            log::info!("Starting wifi");
-            controller.start_async().await.unwrap();
-            log::info!("Wifi started!");
+            Ok(esp_radio::wifi::ap::EventInfo::Disconnected(info)) => {
+                log::info!("Station disconnected: {info:?}")
+            }
+            _ => (),
         }
     }
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static, WifiApDevice>>) {
+async fn net_task(mut runner: Runner<'static, Interface>) {
     runner.run().await
 }
